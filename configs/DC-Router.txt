@@ -1,0 +1,94 @@
+! ============================================================
+! DC-Router (Router2) — Datacenter Gateway
+! Cisco 2911 | IOS 15.1(4)M4
+! IPSec VPN Project — Rooman Technologies Cybersecurity Internship
+! Student: Nithin Nayaka V N | May 2026
+! ============================================================
+
+! ── Step 1: Basic Setup ──────────────────────────────────────
+enable
+configure terminal
+hostname DC-Router
+
+! ── Step 2: Interface Configuration ─────────────────────────
+
+! WAN interface — towards ISP (public internet side)
+interface GigabitEthernet0/0
+ description WAN-to-ISP
+ ip address 10.0.0.6 255.255.255.252
+ no shutdown
+ exit
+
+! LAN interface — Datacenter network
+interface GigabitEthernet0/1
+ description DC-LAN
+ ip address 192.168.2.1 255.255.255.0
+ no shutdown
+ exit
+
+! ── Step 3: Static Routing ───────────────────────────────────
+
+! Route to Head Office LAN via ISP
+ip route 192.168.1.0 255.255.255.0 10.0.0.5
+
+! Route to HO-Router WAN subnet via ISP
+ip route 10.0.0.0 255.255.255.252 10.0.0.5
+
+! ── Step 4: Security License (run BEFORE crypto commands) ────
+! license boot module c2900 technology-package securityk9
+! (Accept EULA, then: write memory + reload)
+
+! ── Step 5: IKE Phase 1 — ISAKMP Policy ─────────────────────
+crypto isakmp policy 10
+ encryption aes 128
+ hash sha
+ authentication pre-share
+ group 2
+ lifetime 86400
+ exit
+
+! Pre-Shared Key — points to HO-Router WAN IP
+crypto isakmp key ROOMAN@VPN address 10.0.0.1
+
+! ── Step 6: IKE Phase 2 — Transform Set ─────────────────────
+crypto ipsec transform-set TSET esp-aes esp-sha-hmac
+
+! ── Step 7: Access Control List (Interesting Traffic) ────────
+! Mirror of HO-Router ACL — DC to HO direction
+access-list 101 permit ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
+
+! ── Step 8: Crypto Map ───────────────────────────────────────
+crypto map VPNMAP 10 ipsec-isakmp
+ set peer 10.0.0.1
+ set transform-set TSET
+ match address 101
+ exit
+
+! ── Step 9: Apply Crypto Map to WAN Interface ────────────────
+interface GigabitEthernet0/0
+ crypto map VPNMAP
+ exit
+
+! ── Save Configuration ───────────────────────────────────────
+exit
+write memory
+
+! ============================================================
+! VERIFICATION COMMANDS (run after tunnel is up)
+! ============================================================
+!
+! show crypto isakmp sa
+!   Expected: dst=10.0.0.1  src=10.0.0.6  state=QM_IDLE  status=ACTIVE
+!
+! show crypto ipsec sa
+!   Expected: #pkts encaps > 0, #pkts encrypt > 0, Status: ACTIVE
+!
+! show crypto map
+!   Expected: Peer=10.0.0.1, Interface=GigabitEthernet0/0
+!
+! show ip route
+!   Expected: S 192.168.1.0/24 [1/0] via 10.0.0.5
+!
+! ping 192.168.1.2
+!   Expected: !!!!! (100% success — triggers VPN tunnel from DC side)
+! ============================================================

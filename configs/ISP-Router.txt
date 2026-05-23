@@ -1,0 +1,62 @@
+! ============================================================
+! ISP-Router (Router0) — Simulated Public Internet
+! Cisco 2911 | IOS 15.1(4)M4
+! IPSec VPN Project — Rooman Technologies Cybersecurity Internship
+! Student: Nithin Nayaka V N | May 2026
+! ============================================================
+!
+! NOTE: This router simulates the public internet (ISP).
+! It does NOT participate in the VPN — it only routes packets
+! between HO-Router and DC-Router.
+! ============================================================
+
+! ── Step 1: Basic Setup ──────────────────────────────────────
+enable
+configure terminal
+hostname ISP-Router
+
+! ── Step 2: Interface Configuration ─────────────────────────
+
+! Interface facing Head Office Router
+interface GigabitEthernet0/0
+ description WAN-facing-HO
+ ip address 10.0.0.2 255.255.255.252
+ no shutdown
+ exit
+
+! Interface facing Datacenter Router
+interface GigabitEthernet0/1
+ description WAN-facing-DC
+ ip address 10.0.0.5 255.255.255.252
+ no shutdown
+ exit
+
+! ── Step 3: Static Routing ───────────────────────────────────
+
+! Route to Head Office LAN (via HO-Router)
+ip route 192.168.1.0 255.255.255.0 10.0.0.1
+
+! Route to Datacenter LAN (via DC-Router)
+ip route 192.168.2.0 255.255.255.0 10.0.0.6
+
+! ── Save Configuration ───────────────────────────────────────
+exit
+write memory
+
+! ============================================================
+! VERIFICATION COMMANDS
+! ============================================================
+!
+! show ip route
+!   Expected:
+!     S 192.168.1.0/24 [1/0] via 10.0.0.1
+!     S 192.168.2.0/24 [1/0] via 10.0.0.6
+!     C 10.0.0.0/30 directly connected, GigabitEthernet0/0
+!     C 10.0.0.4/30 directly connected, GigabitEthernet0/1
+!
+! show ip interface brief
+!   Expected: Gi0/0 = 10.0.0.2 up/up | Gi0/1 = 10.0.0.5 up/up
+!
+! ping 10.0.0.1     -> Should succeed (HO-Router)
+! ping 10.0.0.6     -> Should succeed (DC-Router)
+! ============================================================
